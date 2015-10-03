@@ -22,14 +22,20 @@ static const char* midjaxoncontroller_spec[] =
     "language",          "C++",
     "lang_type",         "compile",
     // Configuration variables
+    "conf.default.debugLevel", "0",
+    "conf.default.axesIds", "0,1,2",
+    "conf.default.scales", "1.0,1.0,1.0",
+    "conf.default.neutrals", "0.0,0.0,0.0",
     ""
   };
 // </rtc-template>
 
 MidJaxonController::MidJaxonController(RTC::Manager* manager)
   : RTC::DataFlowComponentBase(manager),
-    m_u_inIn("u_in", m_u_in),
-    m_u_outOut("u_out", m_u_out)
+    m_qIn("q", m_q),
+    m_axesIn("axes", m_axes),
+    m_buttonsIn("buttons", m_buttons),
+    m_qRefOut("qRef", m_qRef)
 {
 }
 
@@ -40,8 +46,15 @@ MidJaxonController::~MidJaxonController()
 
 RTC::ReturnCode_t MidJaxonController::onInitialize()
 {
-  addInPort("u_in", m_u_inIn);
-  addOutPort("u_out", m_u_outOut);
+  bindParameter("debugLevel", m_debugLevel, "0");
+  addInPort("q", m_qIn);
+  addInPort("axes", m_axesIn);
+  addInPort("buttons", m_buttonsIn);
+  addOutPort("qRef", m_qRefOut);
+  m_axes.data.length(7);
+  for (unsigned int i=0; i<m_axes.data.length(); i++){
+      m_axes.data[i] = 0.0;
+  }
   return RTC::RTC_OK;
 }
 
@@ -76,12 +89,25 @@ RTC::ReturnCode_t MidJaxonController::onDeactivated(RTC::UniqueId ec_id)
   return RTC::RTC_OK;
 }
 */
-/*
+
 RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
 {
+  if (m_axesIn.isNew()) m_axesIn.read();
+  if (m_qIn.isNew()) {
+    m_qIn.read(); 
+    //m_angles.pan  = m_axes.data[0];
+    //m_angles.tilt = m_axes.data[1];
+    //if (m_debugLevel > 0) {
+      std::cerr << m_axes.data[0] << " "
+                << m_axes.data[1] << " "
+                << m_axes.data[2] << " "
+                << m_axes.data[3] << std::endl;
+      //}
+    m_qRefOut.write();
+  }
   return RTC::RTC_OK;
 }
-*/
+
 /*
 RTC::ReturnCode_t MidJaxonController::onAborting(RTC::UniqueId ec_id)
 {

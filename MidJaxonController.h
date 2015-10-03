@@ -58,7 +58,7 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
 
   // The execution action that is invoked periodically
   // former rtc_active_do()
-  // virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
+  virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
 
   // The aborting action when main logic error occurred.
   // former rtc_aborting_entry()
@@ -89,15 +89,19 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
 
   // DataInPort declaration
   // <rtc-template block="inport_declare">
-  TimedDoubleSeq m_u_in;
-  InPort<TimedDoubleSeq> m_u_inIn;
+  TimedDoubleSeq m_q;
+  InPort<TimedDoubleSeq> m_qIn;
+  TimedFloatSeq m_axes;
+  InPort<TimedFloatSeq> m_axesIn;
+  TimedBooleanSeq m_buttons;
+  InPort<TimedBooleanSeq> m_buttonsIn;
 
   // </rtc-template>
 
   // DataOutPort declaration
   // <rtc-template block="outport_declare">
-  TimedDoubleSeq m_u_out;
-  OutPort<TimedDoubleSeq> m_u_outOut;
+  TimedDoubleSeq m_qRef;
+  OutPort<TimedDoubleSeq> m_qRefOut;
 
   // </rtc-template>
 
@@ -117,7 +121,7 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
   // </rtc-template>
 
  private:
-
+  unsigned int m_debugLevel;
 };
 
 

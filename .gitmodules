@@ -1,0 +1,3 @@
+[submodule "hrpsys-base"]
+	path = hrpsys-base
+	url = https://github.com/fkanehiro/hrpsys-base.git

@@ -3,12 +3,63 @@
 # setup script for MIDJAXON controllers
 #   written by Yosuke Matsusaka
 
-from hrpsys import rtm
-import rospy
+import sys
+newpath = []
+for p in sys.path:
+    if p.find('/opt/ros') == 0:
+        print 'remove ros related path %s' % p
+    elif p.find('catkin_ws') >= 0:
+        print 'remove ros related path %s' % p
+    else:
+        newpath.append(p)
+sys.path = newpath
+        
+import rtm
+from hrpsys import OpenHRP
 import os
 import time
 import subprocess
+import copy
 
+actual = [ 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263, -0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
+
+stand = [ 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263, -0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  1.200000, -1.200000,  1.20000,  -1.200000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
+
+maskflipper = [ 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  True,   True,   True,   True, 
+    False,  False,  False,  False,  False,  False ]
+
+maskcrawler = [ 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    True,   True,   True,   True,   True,   True ]
+
+def goactual():
+    seqsvc.setJointAngles(actual, 5)
+
+def gosit():
+    seqsvc.setJointAnglesWithMask(actual, maskflipper, 5)
+
+def gostand():
+    seqsvc.setJointAnglesWithMask(stand, maskflipper, 10)
+
+def setcrawler(lvel, rvel):
+    v = copy.deepcopy(actual)
+    v[30] = v[31] = v[32] = lvel
+    v[33] = v[34] = v[35] = rvel
+    seqsvc.setJointAnglesWithMask(v, maskcrawler, 1)
+    
 # requirement
 # apt-get install ros-indigo-rtmros-common
 
@@ -24,15 +75,7 @@ import atexit
 atexit.register(terminator)
 
 # run rtcd to load components
-plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
-
-# run ros bridges
-bridges = ['ImageSensorROSBridge', 'PointCloudROSBridge', 'RangeSensorROSBridge']
-#bridgepath = subprocess.check_output('rospack find hrpsys_ros_bridge', shell=True).strip()
-bridgepath = os.path.expanduser('~/catkin_ws/install/lib/hrpsys_ros_bridge')
-for b in bridges:
-    plist.append(subprocess.Popen([os.path.join(bridgepath, b)]))
-
+#plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
 
 time.sleep(2)
 
@@ -41,36 +84,58 @@ rtm.nsport=2809
 rtm.initCORBA()
 
 mgr = rtm.findRTCmanager()
+mgr.load('SequencePlayer')
+mgr.load('StateHolder')
+mgr.load('ForwardKinematics')
 mgr.load('Joystick')
 mgr.load('Joystick2PanTiltAngles')
 mgr.load('MidJaxonController')
 
+#ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost, nsport))
+#nc2 = ns2._narrow(CosNaming.NamingContext)
+
 midjaxon = rtm.findRTC('MIDJAXON')
-midjaxon = rtm.findRTC('ImageSensorROSBridgeComp')
+rh = rtm.findRTC('PDcontroller0')
+
+seq = mgr.create('SequencePlayer')
+seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
+sh = mgr.create('StateHolder')
+fk = mgr.create('ForwardKinematics')
+
 js = mgr.create('Joystick')
-jscrawl = mgr.create('Joystick2PanTiltAngles')
-jscrawl.setProperty('axesIds', '0,1')
-jshead = mgr.create('Joystick2PanTiltAngles')
-jshead.setProperty('axesIds', '2,3')
+js.setProperty('device', '/dev/input/js0')
 midc = mgr.create('MidJaxonController')
-#rtabmap = mgr.create('Rtabmap')
+midc.setProperty('debugLevel', '1')
+
+rtm.connectPorts(sh.port("qOut"), rh.port("angleRef"))
+rtm.connectPorts(rh.port("angle"), [sh.port("currentQIn"),
+                                    fk.port("q"),
+                                    midc.port("q")])  # connection for actual joint angles
+rtm.connectPorts(sh.port("qOut"), fk.port("qRef"))
+rtm.connectPorts(seq.port("qRef"), sh.port("qIn"))
+rtm.connectPorts(seq.port("zmpRef"), sh.port("zmpIn"))
+rtm.connectPorts(seq.port("optionalData"), sh.port("optionalDataIn"))
+rtm.connectPorts(sh.port("basePosOut"), [seq.port("basePosInit"),
+                                         fk.port("basePosRef")])
+rtm.connectPorts(sh.port("baseRpyOut"), [seq.port("baseRpyInit"),
+                                         fk.port("baseRpyRef")])
+rtm.connectPorts(sh.port("qOut"), seq.port("qInit"))
+rtm.connectPorts(sh.port("zmpOut"), seq.port("zmpRefInit"))
 
 # connect between joystick and controller
-rtm.connectPorts(js.port('Axes'), jscrawl.port('axes'))
-rtm.connectPorts(js.port('Axes'), jshead.port('axes'))
+rtm.connectPorts(js.port('Axes'), midc.port('axes'))
 
 # connect between controller and PD controller
-rtm.connectPorts(midc.port('angles'), pdc.port('angleRef'))
+#rtm.connectPorts(rh.port('angles'), pdc.port('angleRef'))
 
-# connect between PD controller and robot (this will be done by
-# choreonoid BodyRTC conf file)
-#rtm.connectPorts(midjaxon.port('u_out'), pdc.port('angle'))
-#rtm.connectPorts(pdc.port('torque'), midjaxon.port('q'))
+js.start()
+midc.start()
+fk.start()
+seq.start()
+sh.start()
 
-# connect between robot and mapper
-#rtm.connectPorts(midjaxon.port('camera'), rtabmap.port('camera'))
-#rtm.connectPorts(midc.port('odometry_camera'), pdc.port('odometry'))
-
+seqsvc.setJointAngles(actual, 0.01)
+    
 from IPython import embed
 embed()
 
