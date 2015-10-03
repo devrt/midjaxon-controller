@@ -55,6 +55,10 @@ RTC::ReturnCode_t MidJaxonController::onInitialize()
   for (unsigned int i=0; i<m_axes.data.length(); i++){
       m_axes.data[i] = 0.0;
   }
+  m_buttons.data.length(10);
+  for (unsigned int i=0; i<m_buttons.data.length(); i++){
+      m_buttons.data[i] = false;
+  }
   return RTC::RTC_OK;
 }
 
@@ -77,33 +81,41 @@ RTC::ReturnCode_t MidJaxonController::onShutdown(RTC::UniqueId ec_id)
   return RTC::RTC_OK;
 }
 */
-/*
+
 RTC::ReturnCode_t MidJaxonController::onActivated(RTC::UniqueId ec_id)
 {
+  std::cout << "MidJaxonController::onActivated(" << ec_id << ")" << std::endl;
   return RTC::RTC_OK;
 }
-*/
-/*
+
 RTC::ReturnCode_t MidJaxonController::onDeactivated(RTC::UniqueId ec_id)
 {
+  std::cout << "MidJaxonController::onDeactivated(" << ec_id << ")" << std::endl;
   return RTC::RTC_OK;
 }
-*/
 
 RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
 {
   if (m_axesIn.isNew()) m_axesIn.read();
+  if (m_buttonsIn.isNew()) m_buttonsIn.read();
   if (m_qIn.isNew()) {
-    m_qIn.read(); 
-    //m_angles.pan  = m_axes.data[0];
-    //m_angles.tilt = m_axes.data[1];
-    //if (m_debugLevel > 0) {
-      std::cerr << m_axes.data[0] << " "
-                << m_axes.data[1] << " "
-                << m_axes.data[2] << " "
-                << m_axes.data[3] << std::endl;
-      //}
+    m_qIn.read();
+    m_qRef.data.length(m_q.data.length());
+    for (size_t i = 0; i < m_q.data.length(); i++) {
+      m_qRef.data[i] = m_q.data[i];
+    }
+    double lvel = m_axes.data[0] * -0.01;
+    double rvel = m_axes.data[4] * -0.01;
+    bool l_flip_up = m_buttons.data[4];
+    bool l_flip_down = m_buttons.data[6];
+    bool r_flip_up = m_buttons.data[5];
+    bool r_flip_down = m_buttons.data[7];
+    m_qRef.data[30] = m_qRef.data[31] = m_qRef.data[32] = lvel;
+    m_qRef.data[33] = m_qRef.data[34] = m_qRef.data[35] = rvel;
     m_qRefOut.write();
+    if (m_debugLevel > 0) {
+      printf("lvel %4.1f rvel %4.1f\n", lvel, rvel);
+    }
   }
   return RTC::RTC_OK;
 }

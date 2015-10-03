@@ -104,15 +104,17 @@ fk = mgr.create('ForwardKinematics')
 
 js = mgr.create('Joystick')
 js.setProperty('device', '/dev/input/js0')
+#js.setProperty('debugLevel', '1')
 midc = mgr.create('MidJaxonController')
 midc.setProperty('debugLevel', '1')
 
 rtm.connectPorts(sh.port("qOut"), rh.port("angleRef"))
-rtm.connectPorts(rh.port("angle"), [sh.port("currentQIn"),
-                                    fk.port("q"),
-                                    midc.port("q")])  # connection for actual joint angles
+rtm.connectPorts(midjaxon.port("q"), [sh.port("currentQIn"),
+                                      fk.port("q"),
+                                      midc.port("q")])  # connection for actual joint angles
 rtm.connectPorts(sh.port("qOut"), fk.port("qRef"))
-rtm.connectPorts(seq.port("qRef"), sh.port("qIn"))
+rtm.connectPorts(midc.port("qRef"), sh.port("qIn"))
+#rtm.connectPorts(seq.port("qRef"), sh.port("qIn"))
 rtm.connectPorts(seq.port("zmpRef"), sh.port("zmpIn"))
 rtm.connectPorts(seq.port("optionalData"), sh.port("optionalDataIn"))
 rtm.connectPorts(sh.port("basePosOut"), [seq.port("basePosInit"),
