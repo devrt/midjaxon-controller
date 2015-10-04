@@ -150,6 +150,9 @@ rtm.connectPorts(sh.port("baseRpyOut"), [seq.port("baseRpyInit"),
 rtm.connectPorts(sh.port("qOut"), seq.port("qInit"))
 rtm.connectPorts(sh.port("zmpOut"), seq.port("zmpRefInit"))
 
+# connect gsensor for auto balancing
+rtm.connectPorts(midjaxon.port('gsensor'), midc.port('gsensor'))
+
 # connect between joystick and controller
 rtm.connectPorts(js.port('Axes'), midc.port('axes'))
 rtm.connectPorts(js.port('Buttons'), midc.port('buttons'))

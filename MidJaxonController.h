@@ -8,6 +8,7 @@
 #define MIDJAXONCONTROLLER_H
 
 #include <rtm/idl/BasicDataTypeSkel.h>
+#include <rtm/idl/ExtendedDataTypes.hh>
 #include <rtm/Manager.h>
 #include <rtm/DataFlowComponentBase.h>
 #include <rtm/CorbaPort.h>
@@ -94,6 +95,8 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
   InPort<TimedDoubleSeq> m_qIn;
   TimedDoubleSeq m_qUpstream;
   InPort<TimedDoubleSeq> m_qUpstreamIn;
+  TimedAcceleration3D m_gsensor;
+  InPort<TimedAcceleration3D> m_gsensorIn;
   TimedFloatSeq m_axes;
   InPort<TimedFloatSeq> m_axesIn;
   TimedBooleanSeq m_buttons;
@@ -128,6 +131,8 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
   enum {COMPLETED, TOSIT, TOSTAND} state;
   std::vector<double> prev_flips;
   std::vector<double> offset_flips;
+  double g_x;
+  double g_y;
 };
 
 

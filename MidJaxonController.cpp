@@ -34,6 +34,7 @@ MidJaxonController::MidJaxonController(RTC::Manager* manager)
   : RTC::DataFlowComponentBase(manager),
     m_qIn("q", m_q),
     m_qUpstreamIn("qUpstream", m_qUpstream),
+    m_gsensorIn("gsensor", m_gsensor),
     m_axesIn("axes", m_axes),
     m_buttonsIn("buttons", m_buttons),
     m_qRefOut("qRef", m_qRef)
@@ -50,6 +51,7 @@ RTC::ReturnCode_t MidJaxonController::onInitialize()
   bindParameter("debugLevel", m_debugLevel, "0");
   addInPort("q", m_qIn);
   addInPort("qUpstream", m_qUpstreamIn);
+  addInPort("gsensor", m_gsensorIn);
   addInPort("axes", m_axesIn);
   addInPort("buttons", m_buttonsIn);
   addOutPort("qRef", m_qRefOut);
@@ -69,6 +71,7 @@ RTC::ReturnCode_t MidJaxonController::onInitialize()
   for (unsigned int i=0; i<offset_flips.size(); i++){
     offset_flips[i] = 0.0;
   }
+  g_x = g_y = 0.0;
   state = COMPLETED;
   return RTC::RTC_OK;
 }
@@ -109,6 +112,7 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
 {
   if (m_axesIn.isNew()) m_axesIn.read();
   if (m_buttonsIn.isNew()) m_buttonsIn.read();
+  if (m_gsensorIn.isNew()) m_gsensorIn.read();
   if (m_qUpstreamIn.isNew()) m_qUpstreamIn.read();
   if (m_qIn.isNew()) {
     m_qIn.read();
@@ -117,19 +121,23 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
     for (size_t i = 0; i < m_qUpstream.data.length(); i++) {
       m_qRef.data[i] = m_qUpstream.data[i];
     }
+
+    // control speed of crawlers
     double lvel = m_axes.data[1] * -0.02;
     double rvel = m_axes.data[4] * -0.02;
+    m_qRef.data[30] = m_qRef.data[31] = m_qRef.data[32] = lvel;
+    m_qRef.data[33] = m_qRef.data[34] = m_qRef.data[35] = rvel;
+
+    // control angles of flippers
     bool l_flip_up = m_buttons.data[4];
     bool l_flip_down = m_buttons.data[6];
     bool r_flip_up = m_buttons.data[5];
     bool r_flip_down = m_buttons.data[7];
-    m_qRef.data[30] = m_qRef.data[31] = m_qRef.data[32] = lvel;
-    m_qRef.data[33] = m_qRef.data[34] = m_qRef.data[35] = rvel;
-    bool changed = false;
+    bool flip_changed = false;
     for (unsigned int i=0; i < prev_flips.size(); i++) {
-      if (m_qUpstream.data[26+i] != prev_flips[i]) changed = true;
+      if (m_qUpstream.data[26+i] != prev_flips[i]) flip_changed = true;
     }
-    if (changed) {
+    if (flip_changed) {
       for (unsigned int i=0; i < offset_flips.size(); i++) {
         offset_flips[i] = 0.0;
       }
@@ -151,11 +159,24 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
     for (unsigned int i=0; i < prev_flips.size(); i++) {
       prev_flips[i] = m_qUpstream.data[26+i];
     }
-    //if (state == TOSIT)
+
+    // auto balancer
+    g_x = g_x * 0.999 + m_gsensor.data.ax * 0.001;
+    g_y = g_y * 0.999 + m_gsensor.data.ay * 0.001;
+    if (flip_changed) {
+      m_qRef.data[1] = m_qUpstream.data[0];
+      m_qRef.data[0] = m_qUpstream.data[1];
+    } else {
+      m_qRef.data[1] = g_x * 0.1;
+      m_qRef.data[0] = -g_y * 0.1;
+    }
+    
     m_qRefOut.write();
     if (m_debugLevel > 0) {
-      printf("lvel %4.2f, rvel %4.2f, lflip %4.2f, rflip %4.2f\n",
-             lvel, rvel, offset_flips[0], offset_flips[1]);
+      //printf("lvel %4.2f, rvel %4.2f, lflip %4.2f, rflip %4.2f\n",
+      //       lvel, rvel, offset_flips[0], offset_flips[1]);
+      printf("gsensor %4.2f, %4.2f\n",
+             g_x, g_y);
     }
   }
   return RTC::RTC_OK;
