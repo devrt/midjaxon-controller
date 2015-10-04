@@ -13,6 +13,7 @@
 #include <rtm/CorbaPort.h>
 #include <rtm/DataInPort.h>
 #include <rtm/DataOutPort.h>
+#include <vector>
 
 // Service implementation headers
 // <rtc-template block="service_impl_h">
@@ -91,6 +92,8 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
   // <rtc-template block="inport_declare">
   TimedDoubleSeq m_q;
   InPort<TimedDoubleSeq> m_qIn;
+  TimedDoubleSeq m_qUpstream;
+  InPort<TimedDoubleSeq> m_qUpstreamIn;
   TimedFloatSeq m_axes;
   InPort<TimedFloatSeq> m_axesIn;
   TimedBooleanSeq m_buttons;
@@ -122,6 +125,9 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
 
  private:
   unsigned int m_debugLevel;
+  enum {COMPLETED, TOSIT, TOSTAND} state;
+  std::vector<double> prev_flips;
+  std::vector<double> offset_flips;
 };
 
 

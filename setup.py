@@ -5,11 +5,14 @@
 
 import sys
 newpath = []
+rospath = []
 for p in sys.path:
     if p.find('/opt/ros') == 0:
-        print 'remove ros related path %s' % p
+        print 'temporary remove ros related path %s' % p
+        rospath.append(p)
     elif p.find('catkin_ws') >= 0:
-        print 'remove ros related path %s' % p
+        print 'temporary remove ros related path %s' % p
+        rospath.append(p)
     else:
         newpath.append(p)
 sys.path = newpath
@@ -21,16 +24,31 @@ import time
 import subprocess
 import copy
 
+sys.path.extend(rospath)
+import rospy
+
 actual = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
-    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263, -0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263,  0.000000,  0.000000, 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
 
 stand = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
-    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263, -0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263,  0.000000,  0.000000, 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  1.200000, -1.200000,  1.20000,  -1.200000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
+
+bothflipup = [ 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -0.349066,  0.000000, -1.396263,  0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.400000,  1.400000, -1.400000,  1.400000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
+
+handswide = [ 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  1.600000,  0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.600000,  0.000000,  0.000000,  0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
 
 maskflipper = [ 
@@ -54,6 +72,13 @@ def gosit():
 def gostand():
     seqsvc.setJointAnglesWithMask(stand, maskflipper, 10)
 
+def recover():
+    seqsvc.setJointAngles(bothflipup, 3)
+    seqsvc.waitInterpolation()
+    seqsvc.setJointAngles(handswide, 7)
+    seqsvc.waitInterpolation()
+    goactual()
+    
 def setcrawler(lvel, rvel):
     v = copy.deepcopy(actual)
     v[30] = v[31] = v[32] = lvel
@@ -113,6 +138,7 @@ rtm.connectPorts(midjaxon.port("q"), [sh.port("currentQIn"),
                                       fk.port("q"),
                                       midc.port("q")])  # connection for actual joint angles
 rtm.connectPorts(sh.port("qOut"), fk.port("qRef"))
+rtm.connectPorts(seq.port("qRef"), midc.port("qUpstream"))
 rtm.connectPorts(midc.port("qRef"), sh.port("qIn"))
 #rtm.connectPorts(seq.port("qRef"), sh.port("qIn"))
 rtm.connectPorts(seq.port("zmpRef"), sh.port("zmpIn"))
@@ -126,6 +152,7 @@ rtm.connectPorts(sh.port("zmpOut"), seq.port("zmpRefInit"))
 
 # connect between joystick and controller
 rtm.connectPorts(js.port('Axes'), midc.port('axes'))
+rtm.connectPorts(js.port('Buttons'), midc.port('buttons'))
 
 # connect between controller and PD controller
 #rtm.connectPorts(rh.port('angles'), pdc.port('angleRef'))
