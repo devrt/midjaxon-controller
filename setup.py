@@ -4,6 +4,8 @@
 #   written by Yosuke Matsusaka
 
 import sys
+
+# temporary disable ros path while importing hrpsys
 newpath = []
 rospath = []
 for p in sys.path:
@@ -24,8 +26,15 @@ import time
 import subprocess
 import copy
 
+# now, its your time ros
 sys.path.extend(rospath)
+import roslib; roslib.load_manifest("interactive_markers")
 import rospy
+from visualization_msgs.msg import *
+from interactive_markers.interactive_marker_server import *
+from interactive_markers.menu_handler import *
+from geometry_msgs.msg import Point
+from tf.broadcaster import TransformBroadcaster
 
 actual = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
@@ -45,10 +54,16 @@ bothflipup = [
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.400000,  1.400000, -1.400000,  1.400000, 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
 
-handswide = [ 
-    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  1.600000,  0.000000,  0.000000, 
-    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.600000,  0.000000,  0.000000,  0.000000,  0.000000, 
-    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, 
+handsupflipup = [ 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  math.pi,   0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -math.pi,   0.000000,  0.000000,  0.000000,  0.000000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.400000,  1.400000, -1.400000,  1.400000, 
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
+
+handswide = [
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  1.200000,  0.000000,  0.000000,
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000, -1.200000,  0.000000,  0.000000,  0.000000,  0.000000,
+    0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000 ]
 
 maskflipper = [ 
@@ -73,11 +88,13 @@ def gostand():
     seqsvc.setJointAnglesWithMask(stand, maskflipper, 10)
 
 def recover():
-    seqsvc.setJointAngles(bothflipup, 3)
+    seqsvc.setJointAngles(handsupflipup, 7)
     seqsvc.waitInterpolation()
-    seqsvc.setJointAngles(handswide, 7)
+    seqsvc.setJointAngles(handswide, 12)
     seqsvc.waitInterpolation()
-    goactual()
+    seqsvc.setJointAngles(handswide, 12)
+    #seqsvc.waitInterpolation()
+    #goactual()
     
 def setcrawler(lvel, rvel):
     v = copy.deepcopy(actual)
@@ -85,6 +102,97 @@ def setcrawler(lvel, rvel):
     v[33] = v[34] = v[35] = rvel
     seqsvc.setJointAnglesWithMask(v, maskcrawler, 1)
     
+def processFeedback( feedback ):
+    s = "Feedback from marker '" + feedback.marker_name
+    s += "' / control '" + feedback.control_name + "'"
+
+    mp = ""
+    if feedback.mouse_point_valid:
+        mp = " at " + str(feedback.mouse_point.x)
+        mp += ", " + str(feedback.mouse_point.y)
+        mp += ", " + str(feedback.mouse_point.z)
+        mp += " in frame " + feedback.header.frame_id
+
+    if feedback.event_type == InteractiveMarkerFeedback.BUTTON_CLICK:
+        rospy.loginfo( s + ": button click" + mp + "." )
+    elif feedback.event_type == InteractiveMarkerFeedback.MENU_SELECT:
+        rospy.loginfo( s + ": menu item " + str(feedback.menu_entry_id) + " clicked" + mp + "." )
+    elif feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
+        rospy.loginfo( s + ": pose changed")
+    server.applyChanges()
+
+def alignMarker( feedback ):
+    pose = feedback.pose
+    pose.position.x = round(pose.position.x-0.5)+0.5
+    pose.position.y = round(pose.position.y-0.5)+0.5
+    server.setPose( feedback.marker_name, pose )
+    server.applyChanges()
+
+def make6DofMarker( fixed, interaction_mode, position, show_6dof = False):
+    int_marker = InteractiveMarker()
+    int_marker.header.frame_id = "/WAIST_LINK"
+    int_marker.pose.position = position
+    int_marker.scale = 1
+    int_marker.name = "simple_6dof"
+    int_marker.description = "Simple 6-DOF Control"
+    
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 1
+    control.orientation.y = 0
+    control.orientation.z = 0
+    control.name = "rotate_x"
+    control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 1
+    control.orientation.y = 0
+    control.orientation.z = 0
+    control.name = "move_x"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 1
+    control.orientation.z = 0
+    control.name = "rotate_z"
+    control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 1
+    control.orientation.z = 0
+    control.name = "move_z"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 0
+    control.orientation.z = 1
+    control.name = "rotate_y"
+    control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 0
+    control.orientation.z = 1
+    control.name = "move_y"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    server.insert(int_marker, processFeedback)
+    menu_handler.apply( server, int_marker.name )
+
 # requirement
 # apt-get install ros-indigo-rtmros-common
 
@@ -122,15 +230,15 @@ mgr.load('MidJaxonController')
 midjaxon = rtm.findRTC('MIDJAXON')
 rh = rtm.findRTC('PDcontroller0')
 
-seq = mgr.create('SequencePlayer')
+seq = mgr.create('SequencePlayer', 'seq')
 seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
-sh = mgr.create('StateHolder')
-fk = mgr.create('ForwardKinematics')
+sh = mgr.create('StateHolder', 'sh')
+fk = mgr.create('ForwardKinematics', 'fk')
 
-js = mgr.create('Joystick')
+js = mgr.create('Joystick', 'js')
 js.setProperty('device', '/dev/input/js0')
 #js.setProperty('debugLevel', '1')
-midc = mgr.create('MidJaxonController')
+midc = mgr.create('MidJaxonController', 'midc')
 midc.setProperty('debugLevel', '1')
 
 rtm.connectPorts(sh.port("qOut"), rh.port("angleRef"))
@@ -168,6 +276,16 @@ sh.start()
 
 seqsvc.setJointAngles(actual, 0.01)
     
+rospy.init_node("basic_controls")
+server = InteractiveMarkerServer("basic_controls")
+menu_handler = MenuHandler()
+menu_handler.insert( "First Entry", callback=processFeedback )
+menu_handler.insert( "Second Entry", callback=processFeedback )
+position = Point( 0, 0, 0)
+make6DofMarker( False, InteractiveMarkerControl.MOVE_ROTATE_3D, position, True )
+server.applyChanges()
+rospy.spin()
+
 from IPython import embed
 embed()
 
