@@ -23,9 +23,7 @@ static const char* midjaxoncontroller_spec[] =
     "lang_type",         "compile",
     // Configuration variables
     "conf.default.debugLevel", "0",
-    "conf.default.axesIds", "0,1,2",
-    "conf.default.scales", "1.0,1.0,1.0",
-    "conf.default.neutrals", "0.0,0.0,0.0",
+    "conf.default.autobalance", "0",
     ""
   };
 // </rtc-template>
@@ -49,6 +47,7 @@ MidJaxonController::~MidJaxonController()
 RTC::ReturnCode_t MidJaxonController::onInitialize()
 {
   bindParameter("debugLevel", m_debugLevel, "0");
+  bindParameter("autobalance", m_autobalance, "0");
   addInPort("q", m_qIn);
   addInPort("qUpstream", m_qUpstreamIn);
   addInPort("gsensor", m_gsensorIn);
@@ -163,12 +162,14 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
     // auto balancer
     g_x = g_x * 0.999 + m_gsensor.data.ax * 0.001;
     g_y = g_y * 0.999 + m_gsensor.data.ay * 0.001;
-    if (flip_changed) {
-      m_qRef.data[1] = m_qUpstream.data[0];
-      m_qRef.data[0] = m_qUpstream.data[1];
-    } else {
-      m_qRef.data[1] = g_x * 0.1;
-      m_qRef.data[0] = -g_y * 0.1;
+    if (m_autobalance) {
+      if (flip_changed) {
+        m_qRef.data[1] = m_qUpstream.data[0];
+        m_qRef.data[0] = m_qUpstream.data[1];
+      } else {
+        m_qRef.data[1] = g_x * 0.1;
+        m_qRef.data[0] = -g_y * 0.1;
+      }
     }
     
     m_qRefOut.write();

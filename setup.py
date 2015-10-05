@@ -4,6 +4,7 @@
 #   written by Yosuke Matsusaka
 
 import sys
+import math
 
 # temporary disable ros path while importing hrpsys
 newpath = []
@@ -101,7 +102,13 @@ def setcrawler(lvel, rvel):
     v[30] = v[31] = v[32] = lvel
     v[33] = v[34] = v[35] = rvel
     seqsvc.setJointAnglesWithMask(v, maskcrawler, 1)
-    
+
+def autobalanceon():
+    midc.setProperty('autobalance', '1')
+
+def autobalanceoff():
+    midc.setProperty('autobalance', '0')
+
 def processFeedback( feedback ):
     s = "Feedback from marker '" + feedback.marker_name
     s += "' / control '" + feedback.control_name + "'"
@@ -130,7 +137,7 @@ def alignMarker( feedback ):
 
 def make6DofMarker( fixed, interaction_mode, position, show_6dof = False):
     int_marker = InteractiveMarker()
-    int_marker.header.frame_id = "/WAIST_LINK"
+    int_marker.header.frame_id = "/BODY"
     int_marker.pose.position = position
     int_marker.scale = 1
     int_marker.name = "simple_6dof"
@@ -239,7 +246,8 @@ js = mgr.create('Joystick', 'js')
 js.setProperty('device', '/dev/input/js0')
 #js.setProperty('debugLevel', '1')
 midc = mgr.create('MidJaxonController', 'midc')
-midc.setProperty('debugLevel', '1')
+#midc.setProperty('debugLevel', '1')
+midc.setProperty('autobalance', '1')
 
 rtm.connectPorts(sh.port("qOut"), rh.port("angleRef"))
 rtm.connectPorts(midjaxon.port("q"), [sh.port("currentQIn"),

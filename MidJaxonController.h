@@ -128,6 +128,7 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
 
  private:
   unsigned int m_debugLevel;
+  unsigned int m_autobalance;
   enum {COMPLETED, TOSIT, TOSTAND} state;
   std::vector<double> prev_flips;
   std::vector<double> offset_flips;
