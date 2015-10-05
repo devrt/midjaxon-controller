@@ -21,12 +21,13 @@ for p in sys.path:
 sys.path = newpath
         
 import rtm
-import OpenHRP as OpenHRPOrigin
 from hrpsys import OpenHRP
+import OpenHRP as OpenHRPOrigin
 import os
 import time
 import subprocess
 import copy
+import CosNaming
 
 # now, its your time ros
 sys.path.extend(rospath)
@@ -249,11 +250,16 @@ mgr.load('Joystick')
 mgr.load('Joystick2PanTiltAngles')
 mgr.load('MidJaxonController')
 
-#ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost, nsport))
-#nc2 = ns2._narrow(CosNaming.NamingContext)
+nshost2 = "127.0.0.1"
+nsport2 = "2809"
+ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost2, nsport2))
+nc2 = ns2._narrow(CosNaming.NamingContext)
 
-midjaxon = rtm.findRTC('MIDJAXON')
-rh = rtm.findRTC('PDcontroller0')
+midjaxon = rtm.findRTC('MIDJAXON', nc2)
+rh = rtm.findRTC('PDcontroller0', nc2)
+
+rtm.rootnc.rebind([CosNaming.NameComponent('MIDJAXON', 'rtc')], midjaxon.ref)
+rtm.rootnc.rebind([CosNaming.NameComponent('PDcontroller0', 'rtc')], rh.ref)
 
 seq = mgr.create('SequencePlayer', 'seq')
 seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
@@ -303,6 +309,7 @@ sh.start()
 
 seqsvc.setJointAngles(actual, 0.01)
 
+time.sleep(3)
 modelloader = rtm.findObject('ModelLoader')
 simfactory = rtm.findObject('DynamicsSimulatorFactory')
 planner = simfactory.create()

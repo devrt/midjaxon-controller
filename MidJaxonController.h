@@ -132,6 +132,8 @@ class MidJaxonController  : public RTC::DataFlowComponentBase
   enum {COMPLETED, TOSIT, TOSTAND} state;
   std::vector<double> prev_flips;
   std::vector<double> offset_flips;
+  double offset_yaw;
+  double offset_pitch;
   double g_x;
   double g_y;
 };

@@ -70,6 +70,8 @@ RTC::ReturnCode_t MidJaxonController::onInitialize()
   for (unsigned int i=0; i<offset_flips.size(); i++){
     offset_flips[i] = 0.0;
   }
+  offset_yaw = 0.0;
+  offset_pitch = 0.0;
   g_x = g_y = 0.0;
   state = COMPLETED;
   return RTC::RTC_OK;
@@ -159,6 +161,16 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
       prev_flips[i] = m_qUpstream.data[26+i];
     }
 
+    // yaw of body
+    double yaw = m_axes.data[5];
+    double pitch = m_axes.data[6];
+    double yaw_step = 0.001;
+    offset_yaw += yaw_step * yaw;
+    if (flip_changed) {
+      offset_yaw = 0.0;
+    }
+    m_qRef.data[2] = offset_yaw;
+    
     // auto balancer
     g_x = g_x * 0.999 + m_gsensor.data.ax * 0.001;
     g_y = g_y * 0.999 + m_gsensor.data.ay * 0.001;
