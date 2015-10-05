@@ -21,6 +21,7 @@ for p in sys.path:
 sys.path = newpath
         
 import rtm
+import OpenHRP as OpenHRPOrigin
 from hrpsys import OpenHRP
 import os
 import time
@@ -36,6 +37,8 @@ from interactive_markers.interactive_marker_server import *
 from interactive_markers.menu_handler import *
 from geometry_msgs.msg import Point
 from tf.broadcaster import TransformBroadcaster
+
+ROBOT_URL = "file:///home/yosuke/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
 
 actual = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
@@ -91,9 +94,11 @@ def gostand():
 def recover():
     seqsvc.setJointAngles(handsupflipup, 7)
     seqsvc.waitInterpolation()
-    seqsvc.setJointAngles(handswide, 12)
+    seqsvc.setJointAngles(handsupflipup, 3)
     seqsvc.waitInterpolation()
     seqsvc.setJointAngles(handswide, 12)
+    #seqsvc.waitInterpolation()
+    #seqsvc.setJointAngles(handswide, 12)
     #seqsvc.waitInterpolation()
     #goactual()
     
@@ -109,22 +114,8 @@ def autobalanceon():
 def autobalanceoff():
     midc.setProperty('autobalance', '0')
 
-def processFeedback( feedback ):
-    s = "Feedback from marker '" + feedback.marker_name
-    s += "' / control '" + feedback.control_name + "'"
-
-    mp = ""
-    if feedback.mouse_point_valid:
-        mp = " at " + str(feedback.mouse_point.x)
-        mp += ", " + str(feedback.mouse_point.y)
-        mp += ", " + str(feedback.mouse_point.z)
-        mp += " in frame " + feedback.header.frame_id
-
-    if feedback.event_type == InteractiveMarkerFeedback.BUTTON_CLICK:
-        rospy.loginfo( s + ": button click" + mp + "." )
-    elif feedback.event_type == InteractiveMarkerFeedback.MENU_SELECT:
-        rospy.loginfo( s + ": menu item " + str(feedback.menu_entry_id) + " clicked" + mp + "." )
-    elif feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
+def processFeedback(feedback):
+    if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
         rospy.loginfo( s + ": pose changed")
     server.applyChanges()
 
@@ -135,7 +126,7 @@ def alignMarker( feedback ):
     server.setPose( feedback.marker_name, pose )
     server.applyChanges()
 
-def make6DofMarker( fixed, interaction_mode, position, show_6dof = False):
+def make6DofMarker(position):
     int_marker = InteractiveMarker()
     int_marker.header.frame_id = "/BODY"
     int_marker.pose.position = position
@@ -197,8 +188,33 @@ def make6DofMarker( fixed, interaction_mode, position, show_6dof = False):
     control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
     int_marker.controls.append(control)
 
-    server.insert(int_marker, processFeedback)
-    menu_handler.apply( server, int_marker.name )
+    return int_marker
+
+def showmarker():
+    server.insert(imarker, processFeedback)
+    server.applyChanges()
+
+def hidemarker():
+    server.clear()
+    server.applyChanges()
+
+def updateFK():
+    j = shsvc.getCommand().jointRefs
+    planner.setCharacterAllLinkData("robot", OpenHRPOrigin.DynamicsSimulator.JOINT_VALUE, j)
+    planner.calcCharacterForwardKinematics("robot")
+
+def movemarker():
+    pass
+    
+def solveIK(base, target, pose):
+    updateK()
+    ldata = planner.getCharacterLinkData("robot", target, OpenHRPOrigin.DynamicsSimulator.ABS_TRANSFORM)
+    lp = OpenHRP.LinkPosition(None, None)
+    lp.p = ldata[0:3]
+    lp.R = ldata[3:12]
+    tf.transformations.quaternion_matrix([int_marker.pose.orientation.x, int_marker.pose.orientation.y, int_marker.pose.orientation.z, int_marker.pose.orientation.w])
+    planner.calcCharacterInverseKinematics("robot", "BASE", "LARM_JOINT7", lp)
+    return planner.getCharacterAllLinkData("robot", OpenHRPOrigin.DynamicsSimulator.JOINT_VALUE)
 
 # requirement
 # apt-get install ros-indigo-rtmros-common
@@ -216,6 +232,8 @@ atexit.register(terminator)
 
 # run rtcd to load components
 #plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
+plist.append(subprocess.Popen(["/usr/bin/openhrp-aist-dynamics-simulator"]))
+plist.append(subprocess.Popen(["/usr/bin/openhrp-collision-detector"]))
 
 time.sleep(2)
 
@@ -240,6 +258,7 @@ rh = rtm.findRTC('PDcontroller0')
 seq = mgr.create('SequencePlayer', 'seq')
 seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
 sh = mgr.create('StateHolder', 'sh')
+shsvc = rtm.narrow(sh.service('service0'), 'StateHolderService', 'hrpsys.OpenHRP')
 fk = mgr.create('ForwardKinematics', 'fk')
 
 js = mgr.create('Joystick', 'js')
@@ -283,16 +302,25 @@ seq.start()
 sh.start()
 
 seqsvc.setJointAngles(actual, 0.01)
-    
+
+modelloader = rtm.findObject('ModelLoader')
+simfactory = rtm.findObject('DynamicsSimulatorFactory')
+planner = simfactory.create()
+robot = modelloader.loadBodyInfo(ROBOT_URL)
+planner.registerCharacter("robot", robot)
+planner.init(0.001,
+             OpenHRPOrigin.DynamicsSimulator.RUNGE_KUTTA,
+             OpenHRPOrigin.DynamicsSimulator.DISABLE_SENSOR)
+planner.setGVector([0, 0, 9.8])
+planner.setCharacterAllJointModes("robot", OpenHRPOrigin.DynamicsSimulator.HIGH_GAIN_MODE)
+
 rospy.init_node("basic_controls")
 server = InteractiveMarkerServer("basic_controls")
-menu_handler = MenuHandler()
-menu_handler.insert( "First Entry", callback=processFeedback )
-menu_handler.insert( "Second Entry", callback=processFeedback )
 position = Point( 0, 0, 0)
-make6DofMarker( False, InteractiveMarkerControl.MOVE_ROTATE_3D, position, True )
+imarker = make6DofMarker(position)
+server.insert(imarker, processFeedback)
 server.applyChanges()
-rospy.spin()
+#rospy.spin()
 
 from IPython import embed
 embed()
