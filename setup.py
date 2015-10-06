@@ -4,7 +4,6 @@
 #   written by Yosuke Matsusaka
 
 import sys
-import math
 
 # temporary disable ros path while importing hrpsys
 newpath = []
@@ -20,6 +19,8 @@ for p in sys.path:
         newpath.append(p)
 sys.path = newpath
         
+import math
+import numpy
 import rtm
 import RTM
 from hrpsys import OpenHRP
@@ -38,7 +39,9 @@ from visualization_msgs.msg import *
 from interactive_markers.interactive_marker_server import *
 from interactive_markers.menu_handler import *
 from geometry_msgs.msg import Point
+from geometry_msgs.msg import Pose
 from tf.broadcaster import TransformBroadcaster
+import tf.transformations as tft
 
 ROBOT_URL = "file:///home/player/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
 
@@ -131,7 +134,7 @@ def alignMarker( feedback ):
 
 def make6DofMarker(position):
     int_marker = InteractiveMarker()
-    int_marker.header.frame_id = "/BODY"
+    int_marker.header.frame_id = "/CHEST_LINK2"
     int_marker.pose.position = position
     int_marker.scale = 1
     int_marker.name = "simple_6dof"
@@ -198,25 +201,66 @@ def showmarker():
     server.applyChanges()
 
 def hidemarker():
+    controltarget = None
     server.clear()
     server.applyChanges()
+
+def hrp2pose(hpose):
+    pose = Pose()
+    pose.position.x = hpose[0]
+    pose.position.y = hpose[1]
+    pose.position.z = hpose[2]
+    m = numpy.zeros([4,4])
+    m[0,0] = hpose[3]
+    m[0,1] = hpose[4]
+    m[0,2] = hpose[5]
+    m[1,0] = hpose[6]
+    m[1,1] = hpose[7]
+    m[1,2] = hpose[8]
+    m[2,0] = hpose[9]
+    m[2,1] = hpose[10]
+    m[2,2] = hpose[11]
+    m[3,3] = 1.0
+    quat = tft.quaternion_from_matrix(m)
+    pose.orientation.x = quat[0]
+    pose.orientation.y = quat[1]
+    pose.orientation.z = quat[2]
+    pose.orientation.w = quat[3]
+    return pose
+
+def pose2hrp(pose):
+    lp = OpenHRPOrigin.LinkPosition(None, None)
+    lp.p = [pose.position.x, pose.position.y, pose.position.z]
+    lp.R = tft.quaternion_matrix([pose.orientation.x,
+                                  pose.orientation.y,
+                                  pose.orientation.z,
+                                  pose.orientation.w])[:3,:3].reshape(1,9)[0].tolist()
+    return lp
+
+def controlleft():
+    updateFK()
+    pose = hrp2pose(planner.getCharacterLinkData('robot', 'LARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
+    showmarker()
+    server.setPose(imarker.name, pose)
+    server.applyChanges()
+    controltarget = 'LARM_F_JOINT1'
+
+def controlright():
+    updateFK()
+    pose = hrp2pose(planner.getCharacterLinkData('robot', 'RARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
+    showmarker()
+    server.setPose(imarker.name, pose)
+    server.applyChanges()
+    controltarget = 'RARM_F_JOINT1'
 
 def updateFK():
     j = shsvc.getCommand().jointRefs
     planner.setCharacterAllLinkData("robot", OpenHRPOrigin.DynamicsSimulator.JOINT_VALUE, j)
     planner.calcCharacterForwardKinematics("robot")
 
-def movemarker():
-    pass
-    
 def solveIK(base, target, pose):
-    updateK()
-    ldata = planner.getCharacterLinkData("robot", target, OpenHRPOrigin.DynamicsSimulator.ABS_TRANSFORM)
-    lp = OpenHRP.LinkPosition(None, None)
-    lp.p = ldata[0:3]
-    lp.R = ldata[3:12]
-    tf.transformations.quaternion_matrix([int_marker.pose.orientation.x, int_marker.pose.orientation.y, int_marker.pose.orientation.z, int_marker.pose.orientation.w])
-    planner.calcCharacterInverseKinematics("robot", "BASE", "LARM_JOINT7", lp)
+    lp = pose2hrp(pose)
+    planner.calcCharacterInverseKinematics("robot", "CHEST_JOINT2", target, lp)
     return planner.getCharacterAllLinkData("robot", OpenHRPOrigin.DynamicsSimulator.JOINT_VALUE)
 
 # requirement
@@ -319,11 +363,10 @@ sh.start()
 
 seqsvc.setJointAngles(actual, 0.01)
 
-time.sleep(3)
 modelloader = rtm.findObject('ModelLoader')
+robot = modelloader.loadBodyInfo(ROBOT_URL)
 simfactory = rtm.findObject('DynamicsSimulatorFactory')
 planner = simfactory.create()
-robot = modelloader.loadBodyInfo(ROBOT_URL)
 planner.registerCharacter("robot", robot)
 planner.init(0.001,
              OpenHRPOrigin.DynamicsSimulator.RUNGE_KUTTA,
