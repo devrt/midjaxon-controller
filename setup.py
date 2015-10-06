@@ -40,7 +40,7 @@ from interactive_markers.menu_handler import *
 from geometry_msgs.msg import Point
 from tf.broadcaster import TransformBroadcaster
 
-ROBOT_URL = "file:///home/yosuke/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
+ROBOT_URL = "file:///home/player/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
 
 actual = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
@@ -248,7 +248,7 @@ rtm.initCORBA()
 mgr = rtm.findRTCmanager()
 
 # manager on simulation server
-nshost2 = "192.168.10.2"
+nshost2 = "10.1.4.20"
 nsport2 = "2809"
 ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost2, nsport2))
 nc2 = ns2._narrow(CosNaming.NamingContext)
@@ -277,7 +277,7 @@ rtm.rootnc.rebind([CosNaming.NameComponent('sh', 'rtc')], sh.ref)
 rtm.rootnc.rebind([CosNaming.NameComponent('fk', 'rtc')], fk.ref)
 
 js = mgr.create('Joystick', 'js')
-js.setProperty('device', '/dev/input/js2')
+js.setProperty('device', '/dev/input/js0')
 #js.setProperty('debugLevel', '1')
 midc = mgr2.create('MidJaxonController', 'midc')
 #midc.setProperty('debugLevel', '1')
