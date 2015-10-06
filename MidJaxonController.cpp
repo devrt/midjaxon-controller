@@ -165,11 +165,15 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
     double yaw = m_axes.data[5];
     double pitch = m_axes.data[6];
     double yaw_step = 0.001;
-    offset_yaw += yaw_step * yaw;
+    double pitch_step = 0.001;
+    offset_yaw -= yaw_step * yaw;
+    offset_pitch += pitch_step * pitch;
     if (flip_changed) {
       offset_yaw = 0.0;
+      offset_pitch = 0.0;
     }
     m_qRef.data[2] = offset_yaw;
+    m_qRef.data[4] = offset_pitch;
     
     // auto balancer
     g_x = g_x * 0.999 + m_gsensor.data.ax * 0.001;

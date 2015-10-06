@@ -93,6 +93,7 @@ def gostand():
     seqsvc.setJointAnglesWithMask(stand, maskflipper, 10)
 
 def recover():
+    autobalanceoff()
     seqsvc.setJointAngles(handsupflipup, 7)
     seqsvc.waitInterpolation()
     seqsvc.setJointAngles(handsupflipup, 3)
