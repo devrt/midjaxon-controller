@@ -122,6 +122,10 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
     for (size_t i = 0; i < m_qUpstream.data.length(); i++) {
       m_qRef.data[i] = m_qUpstream.data[i];
     }
+    if (m_axes.data.length() < 6) {
+      m_qRefOut.write();
+      return RTC::RTC_OK;
+    }
 
     // control speed of crawlers
     double lvel = m_axes.data[1] * -0.02;

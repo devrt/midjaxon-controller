@@ -21,6 +21,7 @@ for p in sys.path:
 sys.path = newpath
         
 import rtm
+import RTM
 from hrpsys import OpenHRP
 import OpenHRP as OpenHRPOrigin
 import os
@@ -233,47 +234,55 @@ import atexit
 atexit.register(terminator)
 
 # run rtcd to load components
-#plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
+plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-aist-dynamics-simulator"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-collision-detector"]))
 
 time.sleep(2)
 
-#rtm.nshost=
+rtm.nshost='localhost'
 rtm.nsport=2809
 rtm.initCORBA()
 
+# local manager
 mgr = rtm.findRTCmanager()
-mgr.load('SequencePlayer')
-mgr.load('StateHolder')
-mgr.load('ForwardKinematics')
-mgr.load('Joystick')
-mgr.load('Joystick2PanTiltAngles')
-mgr.load('MidJaxonController')
 
-nshost2 = "127.0.0.1"
+# manager on simulation server
+nshost2 = "192.168.10.2"
 nsport2 = "2809"
 ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost2, nsport2))
 nc2 = ns2._narrow(CosNaming.NamingContext)
+mgr2obj = rtm.orb.string_to_object('corbaloc:iiop:%s:2810/manager' % (nshost2))
+mgr2 = rtm.RTCmanager(mgr2obj._narrow(RTM.Manager))
+
+mgr2.load('SequencePlayer')
+mgr2.load('StateHolder')
+mgr2.load('ForwardKinematics')
+mgr2.load('Joystick')
+mgr2.load('Joystick2PanTiltAngles')
+mgr2.load('MidJaxonController')
 
 midjaxon = rtm.findRTC('MIDJAXON', nc2)
 rh = rtm.findRTC('PDcontroller0', nc2)
+seq = mgr2.create('SequencePlayer', 'seq')
+seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
+sh = mgr2.create('StateHolder', 'sh')
+shsvc = rtm.narrow(sh.service('service0'), 'StateHolderService', 'hrpsys.OpenHRP')
+fk = mgr2.create('ForwardKinematics', 'fk')
 
 rtm.rootnc.rebind([CosNaming.NameComponent('MIDJAXON', 'rtc')], midjaxon.ref)
 rtm.rootnc.rebind([CosNaming.NameComponent('PDcontroller0', 'rtc')], rh.ref)
-
-seq = mgr.create('SequencePlayer', 'seq')
-seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
-sh = mgr.create('StateHolder', 'sh')
-shsvc = rtm.narrow(sh.service('service0'), 'StateHolderService', 'hrpsys.OpenHRP')
-fk = mgr.create('ForwardKinematics', 'fk')
+rtm.rootnc.rebind([CosNaming.NameComponent('seq', 'rtc')], seq.ref)
+rtm.rootnc.rebind([CosNaming.NameComponent('sh', 'rtc')], sh.ref)
+rtm.rootnc.rebind([CosNaming.NameComponent('fk', 'rtc')], fk.ref)
 
 js = mgr.create('Joystick', 'js')
-js.setProperty('device', '/dev/input/js0')
+js.setProperty('device', '/dev/input/js2')
 #js.setProperty('debugLevel', '1')
-midc = mgr.create('MidJaxonController', 'midc')
+midc = mgr2.create('MidJaxonController', 'midc')
 #midc.setProperty('debugLevel', '1')
 midc.setProperty('autobalance', '1')
+rtm.rootnc.rebind([CosNaming.NameComponent('midc', 'rtc')], midc.ref)
 
 rtm.connectPorts(sh.port("qOut"), rh.port("angleRef"))
 rtm.connectPorts(midjaxon.port("q"), [sh.port("currentQIn"),
