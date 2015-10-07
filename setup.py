@@ -147,18 +147,37 @@ def autobalanceoff():
 
 def processFeedback(feedback):
     global pose
-    #if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
     if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
         rospy.loginfo("control target pose changed")
         pose = feedback.pose
         print "controltarget: %s" % controltarget
         if controltarget:
+            updateFK()
             r = solveIK("CHEST_JOINT2", controltarget, pose)
             if controltarget.find("LARM") >= 0:
                 seqsvc.setJointAnglesWithMask(r, maskleftarm, 3)
             if controltarget.find("RARM") >= 0:
                 seqsvc.setJointAnglesWithMask(r, maskrightarm, 3)
-    server.applyChanges()
+
+def processWorkMarkerFeedback(feedback):
+    global workmarkerpose
+    if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
+        workmarkerpose = feedback.pose
+
+def processWorkMarker2Feedback(feedback):
+    global workmarker2pose
+    if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
+        workmarker2pose = feedback.pose
+
+def addpose(pose1, pose2):
+    return [pose1.position.x + pose2.position.x,
+            pose1.position.y + pose2.position.y,
+            pose1.position.z + pose2.position.z]
+
+def subpose(pose1, pose2):
+    return [pose1.position.x - pose2.position.x,
+            pose1.position.y - pose2.position.y,
+            pose1.position.z - pose2.position.z]
 
 def make6DofMarker(position):
     int_marker = InteractiveMarker()
@@ -224,6 +243,43 @@ def make6DofMarker(position):
 
     return int_marker
 
+def makeXYZMarker(position):
+    int_marker = InteractiveMarker()
+    int_marker.header.frame_id = "/BODY"
+    int_marker.pose.position = position
+    int_marker.scale = 1
+    int_marker.name = "WorkMarker"
+    int_marker.description = "WorkMarker"
+    
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 1
+    control.orientation.y = 0
+    control.orientation.z = 0
+    control.name = "move_x"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 1
+    control.orientation.z = 0
+    control.name = "move_z"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    control = InteractiveMarkerControl()
+    control.orientation.w = 1
+    control.orientation.x = 0
+    control.orientation.y = 0
+    control.orientation.z = 1
+    control.name = "move_y"
+    control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+    int_marker.controls.append(control)
+
+    return int_marker
+
 def showmarker():
     server.insert(imarker, processFeedback)
     server.applyChanges()
@@ -231,7 +287,7 @@ def showmarker():
 def hidemarker():
     global controltarget
     controltarget = None
-    server.clear()
+    server.erase(imarker.name)
     server.applyChanges()
 
 def hrp2pose(hpose):
@@ -435,9 +491,15 @@ rospy.init_node("basic_controls")
 server = InteractiveMarkerServer("basic_controls")
 position = Point( 0, 0, 0)
 imarker = make6DofMarker(position)
-br = TransformBroadcaster()
-listener = TransformListener()
+workmarker1 = makeXYZMarker(Point(0, 1.5, 0))
+workmarker1.name = "Work1"
+workmarker1.description = "Work1"
+workmarker2 = makeXYZMarker(Point(0, -1.5, 0))
+workmarker2.name = "Work2"
+workmarker2.description = "Work2"
 server.insert(imarker, processFeedback)
+server.insert(workmarker1, processWorkMarkerFeedback)
+server.insert(workmarker2, processWorkMarker2Feedback)
 server.applyChanges()
 #rospy.spin()
 
