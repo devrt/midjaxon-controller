@@ -100,6 +100,18 @@ maskrightarm = [
      True,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
     False,  False,  False,  False,  False,  False ]
 
+maskleftfinger = [ 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  True,   True,   False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False ]
+
+maskrightfinger = [ 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  True,   True,   False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False ]
+
 def goactual():
     seqsvc.setJointAngles(actual, 5)
 
@@ -139,18 +151,13 @@ def processFeedback(feedback):
     if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
         rospy.loginfo("control target pose changed")
         pose = feedback.pose
-        br.sendTransform((feedback.pose.position.x,
-                          feedback.pose.position.y,
-                          feedback.pose.position.z),
-                         (feedback.pose.orientation.x,
-                          feedback.pose.orientation.y,
-                          feedback.pose.orientation.z,
-                          feedback.pose.orientation.w),
-                         feedback.header.stamp,
-                         "BODY", "control_target")
+        print "controltarget: %s" % controltarget
         if controltarget:
             r = solveIK("CHEST_JOINT2", controltarget, pose)
-            seqsvc.setJointAnglesWithMask(r, maskrightarm, 2)
+            if controltarget.find("LARM") >= 0:
+                seqsvc.setJointAnglesWithMask(r, maskleftarm, 3)
+            if controltarget.find("RARM") >= 0:
+                seqsvc.setJointAnglesWithMask(r, maskrightarm, 3)
     server.applyChanges()
 
 def make6DofMarker(position):
@@ -262,21 +269,33 @@ def pose2hrp(pose):
 def leftcontrol():
     global controltarget
     updateFK()
-    pose = hrp2pose(planner.getCharacterLinkData('robot', 'LARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
+    pose = hrp2pose(planner.getCharacterLinkData('robot', 'LARM_JOINT7', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
     showmarker()
     server.setPose(imarker.name, pose)
     server.applyChanges()
-    controltarget = 'LARM_F_JOINT1'
+    controltarget = 'LARM_JOINT7'
 
 def rightcontrol():
     global controltarget
     updateFK()
-    pose = hrp2pose(planner.getCharacterLinkData('robot', 'RARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
+    pose = hrp2pose(planner.getCharacterLinkData('robot', 'RARM_JOINT7', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
     showmarker()
     server.setPose(imarker.name, pose)
     server.applyChanges()
-    controltarget = 'RARM_F_JOINT1'
+    controltarget = 'RARM_JOINT7'
 
+def leftgrasp(v):
+    j = shsvc.getCommand().jointRefs
+    j[21] = -v
+    j[22] = v
+    seqsvc.setJointAnglesWithMask(j, maskleftfinger, 3)
+    
+def rightgrasp(v):
+    j = shsvc.getCommand().jointRefs
+    j[23] = -v
+    j[24] = v
+    seqsvc.setJointAnglesWithMask(j, maskrightfinger, 3)
+    
 def updateFK():
     j = shsvc.getCommand().jointRefs
     planner.setCharacterAllLinkData("robot", OpenHRPOrigin.DynamicsSimulator.JOINT_VALUE, j)
