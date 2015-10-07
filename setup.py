@@ -41,6 +41,7 @@ from interactive_markers.menu_handler import *
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Pose
 from tf.broadcaster import TransformBroadcaster
+from tf.listener import TransformListener
 import tf.transformations as tft
 
 ROBOT_URL = "file:///home/player/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
@@ -87,6 +88,18 @@ maskcrawler = [
     False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
     True,   True,   True,   True,   True,   True ]
 
+maskleftarm = [ 
+    False,  False,  False,  False,  False,  True,   True,   True,   True,   True, 
+    True,   True,   True,   False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False ]
+
+maskrightarm = [ 
+    False,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  True,   True,    True,   True,   True,   True,   True, 
+     True,  False,  False,  False,  False,  False,  False,  False,  False,  False, 
+    False,  False,  False,  False,  False,  False ]
+
 def goactual():
     seqsvc.setJointAngles(actual, 5)
 
@@ -121,24 +134,32 @@ def autobalanceoff():
     midc.setProperty('autobalance', '0')
 
 def processFeedback(feedback):
-    if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
-        rospy.loginfo( s + ": pose changed")
-    server.applyChanges()
-
-def alignMarker( feedback ):
-    pose = feedback.pose
-    pose.position.x = round(pose.position.x-0.5)+0.5
-    pose.position.y = round(pose.position.y-0.5)+0.5
-    server.setPose( feedback.marker_name, pose )
+    global pose
+    #if feedback.event_type == InteractiveMarkerFeedback.POSE_UPDATE:
+    if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
+        rospy.loginfo("control target pose changed")
+        pose = feedback.pose
+        br.sendTransform((feedback.pose.position.x,
+                          feedback.pose.position.y,
+                          feedback.pose.position.z),
+                         (feedback.pose.orientation.x,
+                          feedback.pose.orientation.y,
+                          feedback.pose.orientation.z,
+                          feedback.pose.orientation.w),
+                         feedback.header.stamp,
+                         "BODY", "control_target")
+        if controltarget:
+            r = solveIK("CHEST_JOINT2", controltarget, pose)
+            seqsvc.setJointAnglesWithMask(r, maskrightarm, 2)
     server.applyChanges()
 
 def make6DofMarker(position):
     int_marker = InteractiveMarker()
-    int_marker.header.frame_id = "/CHEST_LINK2"
+    int_marker.header.frame_id = "/BODY"
     int_marker.pose.position = position
     int_marker.scale = 1
     int_marker.name = "simple_6dof"
-    int_marker.description = "Simple 6-DOF Control"
+    int_marker.description = "ControlTarget"
     
     control = InteractiveMarkerControl()
     control.orientation.w = 1
@@ -201,6 +222,7 @@ def showmarker():
     server.applyChanges()
 
 def hidemarker():
+    global controltarget
     controltarget = None
     server.clear()
     server.applyChanges()
@@ -237,7 +259,8 @@ def pose2hrp(pose):
                                   pose.orientation.w])[:3,:3].reshape(1,9)[0].tolist()
     return lp
 
-def controlleft():
+def leftcontrol():
+    global controltarget
     updateFK()
     pose = hrp2pose(planner.getCharacterLinkData('robot', 'LARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
     showmarker()
@@ -245,7 +268,8 @@ def controlleft():
     server.applyChanges()
     controltarget = 'LARM_F_JOINT1'
 
-def controlright():
+def rightcontrol():
+    global controltarget
     updateFK()
     pose = hrp2pose(planner.getCharacterLinkData('robot', 'RARM_F_JOINT1', OpenHRP.DynamicsSimulator.ABS_TRANSFORM))
     showmarker()
@@ -277,8 +301,17 @@ def terminator():
 import atexit
 atexit.register(terminator)
 
+practicemode = False
+if len(sys.argv) > 1:
+    print "--------------------practice mode------------------"
+    practicemode = True
+else:
+    print "-------------------competition mode-----------------"
+
 # run rtcd to load components
-plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
+if practicemode == False:
+    plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
+plist.append(subprocess.Popen(["/usr/bin/openhrp-model-loader"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-aist-dynamics-simulator"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-collision-detector"]))
 
@@ -293,11 +326,16 @@ mgr = rtm.findRTCmanager()
 
 # manager on simulation server
 nshost2 = "10.1.4.20"
+if practicemode:
+    nshost2 = "localhost"
 nsport2 = "2809"
 ns2 = rtm.orb.string_to_object('corbaloc:iiop:%s:%s/NameService' % (nshost2, nsport2))
 nc2 = ns2._narrow(CosNaming.NamingContext)
-mgr2obj = rtm.orb.string_to_object('corbaloc:iiop:%s:2810/manager' % (nshost2))
-mgr2 = rtm.RTCmanager(mgr2obj._narrow(RTM.Manager))
+if practicemode:
+    mgr2 = mgr
+else:
+    mgr2obj = rtm.orb.string_to_object('corbaloc:iiop:%s:2810/manager' % (nshost2))
+    mgr2 = rtm.RTCmanager(mgr2obj._narrow(RTM.Manager))
 
 mgr2.load('SequencePlayer')
 mgr2.load('StateHolder')
@@ -378,9 +416,13 @@ rospy.init_node("basic_controls")
 server = InteractiveMarkerServer("basic_controls")
 position = Point( 0, 0, 0)
 imarker = make6DofMarker(position)
+br = TransformBroadcaster()
+listener = TransformListener()
 server.insert(imarker, processFeedback)
 server.applyChanges()
 #rospy.spin()
+
+hidemarker()
 
 from IPython import embed
 embed()
