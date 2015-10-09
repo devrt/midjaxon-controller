@@ -176,8 +176,8 @@ RTC::ReturnCode_t MidJaxonController::onExecute(RTC::UniqueId ec_id)
       offset_yaw = 0.0;
       offset_pitch = 0.0;
     }
-    m_qRef.data[2] = offset_yaw;
-    m_qRef.data[4] = offset_pitch;
+    m_qRef.data[2] = m_qUpstream.data[2] + offset_yaw;
+    m_qRef.data[4] =  m_qUpstream.data[4] + offset_pitch;
     
     // auto balancer
     g_x = g_x * 0.999 + m_gsensor.data.ax * 0.001;

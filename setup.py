@@ -112,8 +112,8 @@ maskrightfinger = [
     False,  False,  False,  True,   True,   False,  False,  False,  False,  False, 
     False,  False,  False,  False,  False,  False ]
 
-def goactual():
-    seqsvc.setJointAngles(actual, 5)
+def goactual(t = 5):
+    seqsvc.setJointAngles(actual, t)
 
 def gosit():
     seqsvc.setJointAnglesWithMask(actual, maskflipper, 5)
@@ -138,6 +138,9 @@ def setcrawler(lvel, rvel):
     v[30] = v[31] = v[32] = lvel
     v[33] = v[34] = v[35] = rvel
     seqsvc.setJointAnglesWithMask(v, maskcrawler, 1)
+
+def headyaw(v, t = 2):
+    seqsvc.setJointAngle("HEAD_JOINT0", v, t)
 
 def autobalanceon():
     midc.setProperty('autobalance', '1')
@@ -321,6 +324,11 @@ def pose2hrp(pose):
                                   pose.orientation.z,
                                   pose.orientation.w])[:3,:3].reshape(1,9)[0].tolist()
     return lp
+
+def pose2jvrc(pose):
+    return [-pose.position.y * 1000,
+            (pose.position.x - 1.0) * 1000,
+            (pose.position.z + 0.238) * 1000]
 
 def leftcontrol():
     global controltarget
