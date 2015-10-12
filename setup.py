@@ -428,7 +428,7 @@ mgr2.load('Joystick2PanTiltAngles')
 mgr2.load('MidJaxonController')
 
 midjaxon = rtm.findRTC('MIDJAXON', nc2)
-rh = rtm.findRTC('PDcontroller0', nc2)
+rh = rtm.findRTC('PDcontrollerMIDJAXON0', nc2)
 seq = mgr2.create('SequencePlayer', 'seq')
 seqsvc = rtm.narrow(seq.service('service0'), 'SequencePlayerService', 'hrpsys.OpenHRP')
 sh = mgr2.create('StateHolder', 'sh')
