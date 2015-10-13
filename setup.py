@@ -44,7 +44,8 @@ from tf.broadcaster import TransformBroadcaster
 from tf.listener import TransformListener
 import tf.transformations as tft
 
-ROBOT_URL = "file:///home/player/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/jvrc_models/JAXON_JVRC/MIDJAXON-no-surface.wrl"
+JVRC_MODELS_PATH = subprocess.check_output('rospack find jvrc_models', shell=True).strip()
+ROBOT_URL = "file://" + os.path.join(JVRC_MODELS_PATH, "JAXON_JVRC/MIDJAXON-no-surface.wrl")
 
 actual = [ 
     0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.000000,  0.349066,  0.000000, -1.396263, 
@@ -436,7 +437,7 @@ shsvc = rtm.narrow(sh.service('service0'), 'StateHolderService', 'hrpsys.OpenHRP
 fk = mgr2.create('ForwardKinematics', 'fk')
 
 rtm.rootnc.rebind([CosNaming.NameComponent('MIDJAXON', 'rtc')], midjaxon.ref)
-rtm.rootnc.rebind([CosNaming.NameComponent('PDcontroller0', 'rtc')], rh.ref)
+rtm.rootnc.rebind([CosNaming.NameComponent('PDcontrollerMIDJAXON0', 'rtc')], rh.ref)
 rtm.rootnc.rebind([CosNaming.NameComponent('seq', 'rtc')], seq.ref)
 rtm.rootnc.rebind([CosNaming.NameComponent('sh', 'rtc')], sh.ref)
 rtm.rootnc.rebind([CosNaming.NameComponent('fk', 'rtc')], fk.ref)
