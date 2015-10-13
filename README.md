@@ -1,7 +1,20 @@
-hrpsyspy --port 2809 --robot MIDJAXON
-hcf.init("MIDJAXON")
-rosrun tf static_transform_publisher 0.0 0.0.0 0.0 0.0 0.0 0.0 map WAIST_LINK 100
-/usr/bin/choreonoid /home/yosuke/catkin_ws/src/rtm-ros-robotics/rtmros_choreonoid/hrpsys_ros_bridge_jvrc/config/midjaxon_pdO1.cnoid --start-simulation
-roslaunch hrpsys_ros_bridge_jvrc midjaxon_vision_connect.launch 
-roslaunch hrpsys_ros_bridge_jvrc midjaxon_ros_bridge_choreonoid.launch
-roslaunch hrpsys_ros_bridge_jvrc midjaxon_jvrc.launch 
+Controller for MIDJAXON
+-----------------------
+
+Complete source code for MIDJAXON virtual robot.
+Won the 1st prize of JVRC competition.
+Main part of the source is distributed under 3-clause BSD license.
+
+setup.py : High level controller written using rtm.py and rospy (BSD license)
+
+MidJaxonController.[cpp,h] : Low level real-time controller written in C++ (BSD license)
+
+PDcontrollerMIDJAXON.[cpp,h] : Customized version of PDcontroller forked from hrpsys-base (hrpsys-base license)
+
+rtm.py : rtm.py python script with small bug fix (hrpsys-base license)
+
+Blog article:
+
+
+For the virtual robot model, see:
+https://github.com/devrt/rtmros_choreonoid
