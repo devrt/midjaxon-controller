@@ -75,6 +75,7 @@ from tf.listener import TransformListener
 import tf.transformations as tft
 
 JVRC_MODELS_PATH = subprocess.check_output('rospack find jvrc_models', shell=True).strip()
+JVRC_BRIDGE_PATH = subprocess.check_output('rospack find hrpsys_ros_bridge_jvrc', shell=True).strip()
 ROBOT_URL = "file://" + os.path.join(JVRC_MODELS_PATH, "JAXON_JVRC/MIDJAXON-no-surface.wrl")
 
 actual = [ 
@@ -425,6 +426,10 @@ else:
 # run rtcd to load components
 if practicemode == False:
     plist.append(subprocess.Popen(["/usr/bin/rtcd", "-d"]))
+else:
+    subprocess.check_output('sed -i "s/^model:.*/model: ' + ROBOT_URL.replace('/', '\\/') + '/g" rtc.conf', shell=True)
+    plist.append(subprocess.Popen(["/usr/bin/choreonoid", os.path.join(JVRC_BRIDGE_PATH, 'config/midjaxon_pd'+sys.argv[1]+'.cnoid'), '--start-simulation']))
+    time.sleep(5)
 plist.append(subprocess.Popen(["/usr/bin/openhrp-model-loader"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-aist-dynamics-simulator"]))
 plist.append(subprocess.Popen(["/usr/bin/openhrp-collision-detector"]))
