@@ -14,7 +14,7 @@ PDcontrollerMIDJAXON.[cpp,h] : Customized version of PDcontroller forked from hr
 rtm.py : rtm.py python script with small bug fix (hrpsys-base license)
 
 Blog article:
-
+http://tech.mid-japan.com/blog/2015/10/13/jvrc-midjaxon-sourcecode/
 
 For the virtual robot model, see:
 https://github.com/devrt/rtmros_choreonoid
