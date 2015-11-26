@@ -61,6 +61,10 @@ import subprocess
 import copy
 import CosNaming
 
+# gui stuff (mainly for demonstration)
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+
 # now, its your time ros
 sys.path.extend(rospath)
 import roslib; roslib.load_manifest("interactive_markers")
@@ -422,6 +426,24 @@ if len(sys.argv) > 1:
     practicemode = True
 else:
     print "-------------------competition mode-----------------"
+
+# create gui for control commands
+app = QApplication([])
+window = QWidget()
+window.resize(400, 300)
+window.show()
+layout = QVBoxLayout(window)
+for c in ["goactual()", "gosit()", "gostand()", "recover()",
+          "leftcontrol()", "leftgrasp(0.1)", "leftgrasp(0.5)",
+          "rightcontrol()", "rightgrasp(0.1)", "rightgrasp(0.5)",
+          "headyaw(0)", "headyaw(math.pi/2)", "headyaw(-math.pi/2)",
+          "autobalanceon()", "autobalanceoff()",
+          "showmarker()", "hidemarker()"]:
+    button = QPushButton(c, window)
+    button.setStyleSheet("font-size:32px;")
+    button.clicked.connect(lambda: eval("%s" % window.sender().text()))
+    layout.addWidget(button)
+    button.show()
 
 # run rtcd to load components
 if practicemode == False:
