@@ -58,6 +58,7 @@ PDcontrollerMIDJAXON.so: $(OBJS)
 PDcontrollerMIDJAXON.o: PDcontrollerMIDJAXON.h  
 
 install:
+	mkdir -p /usr/lib/choreonoid-1.5/rtc
 	cp PDcontrollerMIDJAXON.so MIDJAXON.PD.conf /usr/lib/choreonoid-1.5/rtc/
 
 # end of Makefile
